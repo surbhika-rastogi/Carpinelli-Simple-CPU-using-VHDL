@@ -1,0 +1,18 @@
+
+State Machine - |vscpu|stvar_ff
+Name stvar_ff.stjnc stvar_ff.stral stvar_ff.stsll stvar_ff.stcmp2 stvar_ff.stcmp1 stvar_ff.stjmp1 stvar_ff.stinc1 stvar_ff.stand2 stvar_ff.stand1 stvar_ff.stadd2 stvar_ff.stadd1 stvar_ff.stfetch3 stvar_ff.stfetch2 stvar_ff.stfetch1 stvar_ff.sthalt 
+stvar_ff.sthalt 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+stvar_ff.stfetch1 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 
+stvar_ff.stfetch2 0 0 0 0 0 0 0 0 0 0 0 0 1 0 1 
+stvar_ff.stfetch3 0 0 0 0 0 0 0 0 0 0 0 1 0 0 1 
+stvar_ff.stadd1 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 
+stvar_ff.stadd2 0 0 0 0 0 0 0 0 0 1 0 0 0 0 1 
+stvar_ff.stand1 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1 
+stvar_ff.stand2 0 0 0 0 0 0 0 1 0 0 0 0 0 0 1 
+stvar_ff.stinc1 0 0 0 0 0 0 1 0 0 0 0 0 0 0 1 
+stvar_ff.stjmp1 0 0 0 0 0 1 0 0 0 0 0 0 0 0 1 
+stvar_ff.stcmp1 0 0 0 0 1 0 0 0 0 0 0 0 0 0 1 
+stvar_ff.stcmp2 0 0 0 1 0 0 0 0 0 0 0 0 0 0 1 
+stvar_ff.stsll 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 
+stvar_ff.stral 0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 
+stvar_ff.stjnc 1 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
