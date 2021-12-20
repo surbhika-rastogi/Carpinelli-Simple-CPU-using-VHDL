@@ -1,0 +1,161 @@
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity vscpu is
+generic (	VSCPU_D_WIDTH : integer := 8;
+			VSCPU_A_WIDTH : integer := 6;
+			PC_STARTS_AT : std_logic_vector( 5 downto 0) := "000001" ) ;
+
+port (	clock, reset, start, mem_write: in std_logic;
+		addr	: in std_logic_vector(VSCPU_A_WIDTH-1 downto 0);
+		data	: in std_logic_vector(VSCPU_D_WIDTH-1 downto 0));
+
+end entity;
+
+architecture rch of vscpu is
+
+constant INSTR_add: std_logic_vector(1 downto 0):= "00";
+constant INSTR_and: std_logic_vector(1 downto 0):= "01";
+constant INSTR_jmp: std_logic_vector(1 downto 0):= "10";
+constant INSTR_inc: std_logic_vector(1 downto 0):= "11";
+--constant	MEMSIZE : integer :=  ((2**VSCPU_A_WIDTH)-1); -- 64  parameter PC_STARTS_AT = 6'b000001 )
+
+TYPE ram IS ARRAY(63 downto 0) of std_logic_vector(VSCPU_D_WIDTH-1 downto 0);
+signal mem: ram;
+
+signal mem_address : std_logic_vector(VSCPU_A_WIDTH-1 downto 0);
+signal mem_read : std_logic := '0';
+
+--
+--constant ST_FETCH1 : std_logic_vector(5 downto 0) := "000001" ; 
+--constant ST_FETCH2 : std_logic_vector(5 downto 0) := "000010" ;
+--constant ST_FETCH3 : std_logic_vector(5 downto 0) := "000011" ; 
+--constant ST_ADD1   : std_logic_vector(5 downto 0) := "000100" ;
+--constant ST_ADD2   : std_logic_vector(5 downto 0) := "000101" ;
+--constant ST_AND1   : std_logic_vector(5 downto 0) := "000110" ;
+--constant ST_AND2   : std_logic_vector(5 downto 0) := "000111" ;
+--constant ST_JMP1   : std_logic_vector(5 downto 0) := "001000" ;
+--constant ST_INC1   : std_logic_vector(5 downto 0) := "001001" ;
+--constant ST_HALT   : std_logic_vector(5 downto 0) := "111111" ;
+------------------------------------------
+
+type t_state is (sthalt, stfetch1, stfetch2, stfetch3, stadd1, stadd2, stand1, stand2, stinc1, stjmp1);
+signal stvar_ff, stvar_ns: t_state := sthalt;
+signal AC_ff, AC_ns: std_logic_vector(VSCPU_D_WIDTH -1 downto 0) := (others => '0');
+signal PC_ff : std_logic_vector(VSCPU_A_WIDTH -1 downto 0) := PC_STARTS_AT;
+signal PC_ns: std_logic_vector(VSCPU_A_WIDTH -1 downto 0) := (others => '0');
+signal AR_ff, AR_ns: std_logic_vector(VSCPU_A_WIDTH -1 downto 0) := (others => '0');
+signal IR_ff, IR_ns: std_logic_vector(1 downto 0) := (others => '0');
+signal DR_ff, DR_ns: std_logic_vector(VSCPU_D_WIDTH -1 downto 0) := (others => '0');
+signal dbus: std_logic_vector(VSCPU_D_WIDTH-1 downto 0);
+
+begin
+
+--asynchronous update of state storage registers
+process begin 
+	wait until clock='1';
+	if reset = '1' then
+		PC_ff <= PC_STARTS_AT;
+		AC_ff <= (others => '0');
+		AR_ff <= (others => '0');
+		IR_ff <= (others => '0');
+		DR_ff <= (others => '0');
+	else
+		stvar_ff <= stvar_ns;
+		PC_ff <= PC_ns;
+		AC_ff <= AC_ns;
+		AR_ff <= AR_ns;
+		IR_ff <= IR_ns;
+		DR_ff <= DR_ns;
+	end if;
+end process;
+
+process (stvar_ff, PC_ff, AC_ff, DR_ff, AR_ff, IR_ff, dbus)
+begin
+--combinational process for computing next values of datapath registers
+--first defaults
+PC_ns <= PC_ff;
+AC_ns <= AC_ff;
+AR_ns <= AR_ff;
+IR_ns <= IR_ff;
+DR_ns <= DR_ff;
+case(stvar_ff) is
+	when sthalt => null;
+	when stfetch1 => AR_ns <= PC_ff; 
+	when stfetch2 => 
+		PC_ns <= std_logic_vector(unsigned(PC_ff) +1);
+		DR_ns <= dbus;
+		IR_ns <= dbus(VSCPU_D_WIDTH-1 downto VSCPU_D_WIDTH-2); 
+		AR_ns <= DR_ns(VSCPU_D_WIDTH-3 downto 0) ; 
+	when stfetch3 => null;
+	when stadd1 => DR_ns <= dbus;
+	when stadd2 => AC_ns <= std_logic_vector(unsigned(AC_ff) + unsigned(DR_ff));
+	when stand1 => DR_ns <= dbus;
+	when stand2 => AC_ns <= AC_ff and DR_ff;
+	when stinc1 => AC_ns <= std_logic_vector(unsigned(AC_ff) + 1);
+	when stjmp1 => PC_ns <= DR_ff(VSCPU_D_WIDTH-3 downto 0);
+end case;
+end process;
+
+process (stvar_ff, IR_ff)
+begin
+--combinational process for computing next values of controller state
+--first defaults
+stvar_ns <= stvar_ff;
+case(stvar_ff) is
+	when sthalt => if(start ='1') then stvar_ns <= stfetch1; end if;
+--	when sthalt =>   stvar_ns <= sthalt;
+	when stfetch1 => stvar_ns <= stfetch2;
+	when stfetch2 => stvar_ns <= stfetch3;
+	when stfetch3 =>
+		case(IR_ff) is
+			when INSTR_add => stvar_ns <= stadd1;
+			when INSTR_and => stvar_ns <= stand1;
+			when INSTR_inc => stvar_ns <= stinc1;
+			when INSTR_jmp => stvar_ns <= stjmp1;
+			when "others" => stvar_ns <= sthalt;
+		end case;
+	when stadd1 => stvar_ns <= stadd2;
+	when stadd2 => stvar_ns <= stfetch1;
+	when stand1 => stvar_ns <= stand2;
+	when stand2 => stvar_ns <= stfetch1;
+	when stinc1 => stvar_ns <= stfetch1;
+	when stjmp1 => stvar_ns <= stfetch1;
+end case;
+end process;
+
+-- ram mem (with synchronous write and asynchronous reads)
+process begin
+	wait until clock = '1';
+	if reset = '1' then
+		for i in 0 to 63 loop
+			mem(i) <= (others => '0');
+		end loop;
+	elsif (mem_write = '1') then 
+		mem(to_integer(unsigned(mem_address))) <= data; 
+	end if;
+end process;
+
+dbus <= mem(to_integer(unsigned(mem_address))) when mem_read = '1' else (others => '0');
+
+mem_read <= '1' when stvar_ff=stfetch2 or stvar_ff=stadd1 or stvar_ff=stand1 else '0';
+
+mem_address <= addr when sthalt=stvar_ff else AR_ff;
+
+process
+begin
+wait until clock = '1';
+	if(stvar_ff=stfetch1) then
+		--report "-----> AC = " & std_logic_vector'image(AC_ff);
+		report "test";
+	end if;
+end process;
+
+-- process (clock)
+-- begin
+	-- report "-----> AC = " & std_logic_vector'image(AC_ff);
+-- end process;
+
+end architecture;
+
